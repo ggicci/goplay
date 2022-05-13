@@ -1,5 +1,5 @@
 export type CompilerEvent = {
-  Delay: number
+  Delay: number // in nanoseconds
   Kind: string
   Message: string
 }
@@ -10,6 +10,8 @@ export type CompilerResponse = {
 }
 
 export type CompilerVersion = 'gopre' | 'gotip'
+
+const sleep = (n: number) => new Promise((res) => setTimeout(res, n))
 
 export class GoPlayProxy {
   constructor(public proxyUrl: string = '/goplay') {}
@@ -35,70 +37,41 @@ export class GoPlayProxy {
     return await resp.json()
   }
 
-  public async renderCompile(sourceCode: string, goVersion?: CompilerVersion): Promise<HTMLElement> {
-    const pre = document.createElement('pre')
-    const code = document.createElement('code')
-    code.classList.add('text')
+  public async renderCompile(container: HTMLElement, sourceCode: string, goVersion?: CompilerVersion): Promise<void> {
+    container.replaceChildren(this.renderMessage('system', 'Waiting for remote server...'))
     const js = await this.compile(sourceCode, goVersion)
-    const stdout = document.createElement('span')
-    stdout.classList.add('stdout')
-    const stderr = document.createElement('span')
-    stderr.classList.add('stderr')
-    const system = document.createElement('span')
-    system.classList.add('system')
 
+    // Clear output.
+    container.replaceChildren()
+
+    // Render build error.
     if (js.Errors != '') {
-      stderr.innerText = js.Errors
-    } else {
-      system.innerText = 'Program exited.'
+      container.appendChild(this.renderMessage('error', js.Errors))
+      container.appendChild(this.renderMessage('system', '\nGo build failed.'))
+      return
     }
 
-    if (js.Events === null) {
-      if (js.Errors != '') {
-        system.innerText = 'Go build failed.'
-      }
-    }
-
+    // Render events.
     for (const event of js.Events || []) {
-      // TODO: what is Delay used for?
-      switch (event.Kind) {
-        case 'stdout':
-          stdout.innerText += event.Message
-          break
-        case 'stderr':
-          stderr.innerText += event.Message
-          break
-        case 'system':
-          system.innerText += event.Message
-          break
-      }
+      container.appendChild(await this.renderEvent(event))
     }
 
-    code.appendChild(stderr)
-    code.appendChild(stdout)
-    code.appendChild(system)
-    pre.appendChild(code)
-    return pre
+    container.appendChild(this.renderMessage('system', '\nProgram exited.'))
   }
 
-  renderPlaintext(text: string): HTMLElement {
-    const pre = document.createElement('pre')
-    const code = document.createElement('code')
-    code.classList.add('text')
-    code.innerText = text
-    pre.appendChild(code)
-    return pre
-  }
-
-  public async renderCompileTo(container: HTMLElement, sourceCode: string, goVersion?: CompilerVersion): Promise<void> {
-    container.replaceChildren(this.renderPlaintext('Waiting for remote server...'))
-
-    try {
-      const output = await this.renderCompile(sourceCode, goVersion)
-      container.replaceChildren(output)
-    } catch (error) {
-      container.replaceChildren(this.renderPlaintext(String(error)))
+  async renderEvent(e: CompilerEvent): Promise<HTMLSpanElement> {
+    if (e.Delay >= 0) {
+      await sleep(e.Delay / 1000000)
     }
+
+    return this.renderMessage(e.Kind, e.Message)
+  }
+
+  renderMessage(kind: string, message: string): HTMLSpanElement {
+    const output = document.createElement('span')
+    output.classList.add(kind)
+    output.innerText = message
+    return output
   }
 
   public async share(sourceCode: string, goVersion?: CompilerVersion): Promise<string> {
@@ -111,5 +84,3 @@ export class GoPlayProxy {
     return goVersion ? `${canonical}?v=${goVersion}` : canonical
   }
 }
-
-globalThis.GoPlay = GoPlayProxy
