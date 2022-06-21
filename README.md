@@ -23,3 +23,8 @@ When working with **Docusaurus**, we can create a custom component to use `@ggic
 ### Customizations
 
 Use `@ggicci/goplay`'s API directly. Read [use @ggicci/goplay](https://ggicci.me/posts/goplay-embed-go-playground-on-your-website/#use-ggiccigoplay) for details and sample code.
+
+
+## Resources
+
+- A Go Playground Alternative: https://goplay.tools/
